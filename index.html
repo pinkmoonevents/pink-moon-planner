@@ -3185,8 +3185,10 @@ async function loadAllData() {
 async function saveEventToDB(ev) {
   showSaving();
   try {
+    // Only include id if it's a real UUID (not our readable string IDs)
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ev.id);
     const evData = {
-      id: ev.id,
+      ...(isUUID ? {id: ev.id} : {}),
       name: ev.name,
       code: ev.code,
       format: ev.format,
@@ -3203,13 +3205,14 @@ async function saveEventToDB(ev) {
       use_sub_events: ev.use_sub_events || false,
       updated_at: new Date().toISOString(),
     };
-    await sb.upsert('events', evData, 'id');
+    const evResult = await sb.upsert('events', evData, 'id');
 
     // Save sub-events
     for (let i=0; i<(ev.sub_events||[]).length; i++) {
       const se = ev.sub_events[i];
+      const isSubUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(se.id);
       await sb.upsert('sub_events', {
-        id: se.id,
+        ...(isSubUUID ? {id: se.id} : {}),
         event_id: ev.id,
         name: se.name,
         service_type: se.service_type,
@@ -3226,6 +3229,7 @@ async function saveEventToDB(ev) {
       }, 'id');
     }
     showSaved();
+    return evResult;
   } catch(e) {
     showSaveError(e.message);
     console.error('Save error:', e);
@@ -3290,7 +3294,13 @@ async function seedInitialData() {
   for (let i=0; i<events.length; i++) {
     const ev = events[i];
     ev.sort_order = i;
-    await saveEventToDB(ev);
+    try {
+      const result = await saveEventToDB(ev);
+      // Update local event ID with the UUID returned from DB
+      if (result && result[0] && result[0].id) {
+        ev.id = result[0].id;
+      }
+    } catch(e) { console.warn('Seed error for', ev.name, e.message); }
   }
   console.log('Seeded', events.length, 'events');
   return true;
