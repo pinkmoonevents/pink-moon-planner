@@ -3022,23 +3022,33 @@ function showLoginScreen() {
 }
 
 async function doSignIn() {
-  const email = document.getElementById('login-email')?.value?.trim();
-  const password = document.getElementById('login-password')?.value;
+  const emailEl = document.getElementById('login-email');
+  const passEl = document.getElementById('login-password');
   const errEl = document.getElementById('auth-error');
-  if (!email || !password) { errEl.style.display='block'; errEl.textContent='Please enter email and password.'; return; }
+  const btn = document.querySelector('button[onclick="doSignIn()"]');
+  const email = emailEl?.value?.trim();
+  const password = passEl?.value;
+
+  if (!email || !password) {
+    if (errEl) { errEl.style.display='block'; errEl.textContent='Please enter email and password.'; }
+    return;
+  }
   try {
-    errEl.style.display='none';
-    const btn = document.querySelector('button[onclick="doSignIn()"]');
-    btn.textContent = 'Signing in...'; btn.disabled = true;
-    await sb.signIn(email, password);
+    if (errEl) errEl.style.display='none';
+    if (btn) { btn.textContent = 'Signing in...'; btn.disabled = true; }
+    const signInResult = await sb.signIn(email, password);
+    console.log('Sign in result:', signInResult);
     const userStr = localStorage.getItem('pm_user');
     currentUser = userStr ? JSON.parse(userStr) : null;
     await initApp();
   } catch(e) {
-    const errEl = document.getElementById('auth-error');
-    if (errEl) { errEl.style.display='block'; errEl.textContent = e.message || 'Sign in failed. Check your email and password.'; }
-    const btn = document.querySelector('button[onclick="doSignIn()"]');
-    if (btn) { btn.textContent = 'Sign in'; btn.disabled = false; }
+    // Re-fetch elements as they may have re-rendered
+    const errEl2 = document.getElementById('auth-error');
+    const btn2 = document.querySelector('button[onclick="doSignIn()"]');
+    const msg = e.message || 'Sign in failed. Check your email and password.';
+    if (errEl2) { errEl2.style.display='block'; errEl2.textContent = msg; }
+    else { alert(msg); }
+    if (btn2) { btn2.textContent = 'Sign in'; btn2.disabled = false; }
   }
 }
 
